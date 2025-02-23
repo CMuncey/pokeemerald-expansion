@@ -1020,7 +1020,7 @@ bool8 ScrCmd_applymovement(struct ScriptContext *ctx)
     struct ObjectEvent *objEvent;
 
     // When applying script movements to follower, it may have frozen animation that must be cleared
-    if ((localId == OBJ_EVENT_ID_FOLLOWER && (objEvent = GetFollowerObject()) && objEvent->frozen) 
+    if ((localId == OBJ_EVENT_ID_FOLLOWER && (objEvent = GetFollowerObject()) && objEvent->frozen)
             || ((objEvent = &gObjectEvents[GetObjectEventIdByLocalId(localId)]) && IS_OW_MON_OBJ(objEvent)))
     {
         ClearObjectEventMovement(objEvent, &gSprites[objEvent->spriteId]);
@@ -1868,24 +1868,49 @@ bool8 ScrCmd_setmonmove(struct ScriptContext *ctx)
     return FALSE;
 }
 
-bool8 ScrCmd_checkpartymove(struct ScriptContext *ctx)
+bool8 ScrCmd_checkpartymove( struct ScriptContext* ctx )
 {
     u8 i;
-    u16 moveId = ScriptReadHalfword(ctx);
-
+    u16 moveId = ScriptReadHalfword( ctx );
     gSpecialVar_Result = PARTY_SIZE;
-    for (i = 0; i < PARTY_SIZE; i++)
+
+    u16 hidden_moves[] = { MOVE_CUT, MOVE_SURF, MOVE_STRENGTH, MOVE_ROCK_SMASH, MOVE_WATERFALL, MOVE_DIVE, MOVE_NONE };
+    bool8 is_hm = FALSE;
+
+    // Determine if we're dealing with a hidden move
+    for ( i = 0; hidden_moves[ i ] != MOVE_NONE; ++i )
+        if ( hidden_moves[ i ] == moveId )
+            is_hm = TRUE;
+
+    // First check if any party pokemon actually knows the move
+    for ( i = 0; i < PARTY_SIZE; i++ )
     {
-        u16 species = GetMonData(&gPlayerParty[i], MON_DATA_SPECIES, NULL);
-        if (!species)
+        struct Pokemon* mon = &gPlayerParty[ i ];
+        u16 species = GetMonData( mon, MON_DATA_SPECIES, NULL );
+
+        if ( ! species )
             break;
-        if (!GetMonData(&gPlayerParty[i], MON_DATA_IS_EGG) && MonKnowsMove(&gPlayerParty[i], moveId) == TRUE)
+
+        if ( GetMonData( mon, MON_DATA_IS_EGG ) )
+            continue;
+
+        if ( MonKnowsMove( mon, moveId ) == TRUE )
         {
             gSpecialVar_Result = i;
             gSpecialVar_0x8004 = species;
             break;
         }
+
+        // If it's an HM, just check if we can learn the move
+        // Don't break on this one in order to give pokemon
+        // who might actually know the move later on priority
+        if ( is_hm && gSpecialVar_Result == PARTY_SIZE && CanLearnTeachableMove( species, moveId ) )
+        {
+            gSpecialVar_Result = i;
+            gSpecialVar_0x8004 = species;
+        }
     }
+
     return FALSE;
 }
 
