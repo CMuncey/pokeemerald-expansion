@@ -30,6 +30,7 @@
 #include "constants/moves.h"
 #include "constants/songs.h"
 #include "constants/trainer_types.h"
+#include "item.h"
 
 #define NUM_FORCED_MOVEMENTS 18
 #define NUM_ACRO_BIKE_COLLISIONS 5
@@ -1321,16 +1322,23 @@ bool8 PartyHasMonWithSurf(void)
 {
     u8 i;
 
-    if (!TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_SURFING))
+    if ( ! TestPlayerAvatarFlags( PLAYER_AVATAR_FLAG_SURFING ) )
     {
-        for (i = 0; i < PARTY_SIZE; i++)
+        for ( i = 0; i < PARTY_SIZE; ++i )
         {
-            if (GetMonData(&gPlayerParty[i], MON_DATA_SPECIES) == SPECIES_NONE)
+            if ( GetMonData( &gPlayerParty[ i ], MON_DATA_SPECIES ) == SPECIES_NONE )
                 break;
-            if (MonKnowsMove(&gPlayerParty[i], MOVE_SURF))
+
+            if ( MonKnowsMove( &gPlayerParty[ i ], MOVE_SURF ) )
                 return TRUE;
+
+            // If the player has the HM for surf and a pokemon that could learn it, pass the check
+            if ( CheckBagHasItem( ITEM_HM_SURF, 1 ) )
+                if ( CanLearnTeachableMove( GetMonData( &gPlayerParty[ i ], MON_DATA_SPECIES ), MOVE_SURF ) )
+                    return TRUE;
         }
     }
+
     return FALSE;
 }
 
