@@ -1155,3 +1155,26 @@ static const u16 sRotomFormChangeMoves[5] =
     ROTOM_FAN_MOVE,
     ROTOM_MOW_MOVE,
 };
+
+static const struct ListMenuTemplate sSelectActionListMenuTemplate =
+{
+    .items = NULL,
+    .moveCursorFunc = ListMenuDefaultCursorMoveFunc,
+    .itemPrintFunc = NULL,
+    .totalItems = 0,
+    .maxShowed = 8,
+    .textNarrowWidth = 0,
+    .windowId = 0,
+    .header_X = 0,
+    .item_X = 8,
+    .cursor_X = 0,
+    .upText_Y = 1,
+    .cursorPal = 2,
+    .fillValue = 1,
+    .cursorShadowPal = 3,
+    .lettersSpacing = 0,
+    .itemVerticalPadding = 0,
+    .scrollMultiple = LIST_NO_MULTIPLE_SCROLL,
+    .fontId = FONT_NORMAL,
+    .cursorKind = 0
+};

@@ -9,6 +9,7 @@
 #include "battle_pyramid.h"
 #include "battle_pyramid_bag.h"
 #include "bg.h"
+#include "braille_puzzles.h"
 #include "contest.h"
 #include "data.h"
 #include "decompress.h"
@@ -65,16 +66,25 @@
 #include "trade.h"
 #include "union_room.h"
 #include "window.h"
+#include "constants/abilities.h"
 #include "constants/battle.h"
 #include "constants/battle_frontier.h"
 #include "constants/field_effects.h"
+#include "constants/event_objects.h"
 #include "constants/form_change_types.h"
 #include "constants/item_effects.h"
 #include "constants/items.h"
+#include "constants/map_types.h"
 #include "constants/moves.h"
 #include "constants/party_menu.h"
 #include "constants/rgb.h"
 #include "constants/songs.h"
+
+#define CUT_NORMAL_SIDE 3
+#define CUT_NORMAL_AREA CUT_NORMAL_SIDE * CUT_NORMAL_SIDE
+
+#define CUT_HYPER_SIDE 5
+#define CUT_HYPER_AREA CUT_HYPER_SIDE * CUT_HYPER_SIDE
 
 enum {
     MENU_SUMMARY,
@@ -206,7 +216,7 @@ struct PartyMenuInternal
     u32 spriteIdCancelPokeball:7;
     u32 messageId:14;
     u8 windowId[3];
-    u8 actions[8];
+    u8 actions[18];
     u8 numActions;
     // In vanilla Emerald, only the first 0xB0 hwords (0x160 bytes) are actually used.
     // However, a full 0x100 hwords (0x200 bytes) are allocated.
@@ -353,6 +363,7 @@ static u8 GetPartyMenuActionsTypeInBattle(struct Pokemon *);
 static u8 GetPartySlotEntryStatus(s8);
 static void Task_UpdateHeldItemSprite(u8);
 static void Task_HandleSelectionMenuInput(u8);
+static void Task_HandleActionMenuInput( u8 );
 static void CB2_ShowPokemonSummaryScreen(void);
 static void UpdatePartyToBattleOrder(void);
 static void CB2_ReturnToPartyMenuFromSummaryScreen(void);
@@ -490,7 +501,7 @@ static void CursorCb_Register(u8);
 static void CursorCb_Trade1(u8);
 static void CursorCb_Trade2(u8);
 static void CursorCb_Toss(u8);
-static void CursorCb_FieldMove(u8);
+static void CursorCb_FieldMove( u8, u8 );
 static void CursorCb_CatalogBulb(u8);
 static void CursorCb_CatalogOven(u8);
 static void CursorCb_CatalogWashing(u8);
@@ -2694,58 +2705,113 @@ static bool8 ShouldUseChooseMonText(void)
     return FALSE;
 }
 
-static u8 DisplaySelectionWindow(u8 windowType)
+struct ListMenuItem gActionMenuItems[ 18 ];
+u8 action_menu_names[ 18 ][ 32 ];
+
+static void DisplayActionsWindow( u8 taskId )
+{
+    u8 i, menuTaskId;
+
+    struct ListMenuTemplate list_menu = sSelectActionListMenuTemplate;
+    const u8 color[] = _("{COLOR BLUE}");
+
+    // For every action, add it to items array
+    for ( i = 0; i < sPartyMenuInternal->numActions; ++i )
+    {
+        const u8* text;
+        action_menu_names[ i ][ 0 ] = EOS;
+
+        if ( sPartyMenuInternal->actions[ i ] >= MENU_FIELD_MOVES )
+            text = gMovesInfo[ sFieldMoves[ sPartyMenuInternal->actions[ i ] - MENU_FIELD_MOVES ] ].name;
+        else
+            text = sCursorOptions[ sPartyMenuInternal->actions[ i ] ].text;
+
+        if ( sPartyMenuInternal->actions[ i ] >= MENU_FIELD_MOVES )
+            StringCopy( action_menu_names[ i ], color );
+        StringAppend( action_menu_names[ i ], text );
+
+        gActionMenuItems[ i ].name = action_menu_names[ i ];
+        gActionMenuItems[ i ].id = sPartyMenuInternal->actions[ i ];
+    }
+
+    // The rest is just default values in the template
+    list_menu.items = gActionMenuItems;
+    list_menu.totalItems = sPartyMenuInternal->numActions;
+    list_menu.windowId = sPartyMenuInternal->windowId[ 0 ];
+    list_menu.item_X = GetMenuCursorDimensionByFont( FONT_NORMAL, 0 );
+    list_menu.lettersSpacing = GetFontAttribute( FONT_NORMAL, FONTATTR_LETTER_SPACING );
+    menuTaskId = ListMenuInit( &list_menu, 0, 0 );
+
+    gTasks[ taskId ].data[ 0 ] = menuTaskId;
+    gTasks[ taskId ].data[ 1 ] = sPartyMenuInternal->windowId[ 0 ];
+
+    return;
+}
+
+static u8 DisplaySelectionWindow( u8 windowType )
 {
     struct WindowTemplate window;
-    u8 cursorDimension;
-    u8 letterSpacing;
-    u8 i;
+
+    u8 i, left, height, top;
 
     switch (windowType)
     {
-    case SELECTWINDOW_ACTIONS:
-        SetWindowTemplateFields(&window, 2, 19, 19 - (sPartyMenuInternal->numActions * 2), 10, sPartyMenuInternal->numActions * 2, 14, 0x2E9);
-        break;
-    case SELECTWINDOW_ITEM:
-        window = sItemGiveTakeWindowTemplate;
-        break;
-    case SELECTWINDOW_MAIL:
-        window = sMailReadTakeWindowTemplate;
-        break;
-    case SELECTWINDOW_CATALOG:
-        window = sCatalogSelectWindowTemplate;
-        break;
-    case SELECTWINDOW_ZYGARDECUBE:
-        window = sZygardeCubeSelectWindowTemplate;
-        break;
-    default: // SELECTWINDOW_MOVES
-        window = sMoveSelectWindowTemplate;
-        break;
+        case SELECTWINDOW_ACTIONS:
+            left = 19;
+            height = ( sPartyMenuInternal->numActions > 8 ) ? 16 : sPartyMenuInternal->numActions * 2;
+            top = left - height;
+            SetWindowTemplateFields( &window, 2, left, top, 10, height, 14, 0x2E9);
+            break;
+
+        case SELECTWINDOW_ITEM:
+            window = sItemGiveTakeWindowTemplate;
+            break;
+
+        case SELECTWINDOW_MAIL:
+            window = sMailReadTakeWindowTemplate;
+            break;
+
+        case SELECTWINDOW_CATALOG:
+            window = sCatalogSelectWindowTemplate;
+            break;
+
+        case SELECTWINDOW_ZYGARDECUBE:
+            window = sZygardeCubeSelectWindowTemplate;
+            break;
+
+        default: // SELECTWINDOW_MOVES
+            window = sMoveSelectWindowTemplate;
+            break;
     }
 
-    sPartyMenuInternal->windowId[0] = AddWindow(&window);
-    DrawStdFrameWithCustomTileAndPalette(sPartyMenuInternal->windowId[0], FALSE, 0x4F, 13);
-    if (windowType == SELECTWINDOW_MOVES)
-        return sPartyMenuInternal->windowId[0];
-    cursorDimension = GetMenuCursorDimensionByFont(FONT_NORMAL, 0);
-    letterSpacing = GetFontAttribute(FONT_NORMAL, FONTATTR_LETTER_SPACING);
+    sPartyMenuInternal->windowId[ 0 ] = AddWindow( &window );
+    DrawStdFrameWithCustomTileAndPalette( sPartyMenuInternal->windowId[ 0 ], FALSE, 0x4F, 13 );
+    if ( windowType == SELECTWINDOW_MOVES )
+        return sPartyMenuInternal->windowId[ 0 ];
 
-    for (i = 0; i < sPartyMenuInternal->numActions; i++)
+    if ( windowType == SELECTWINDOW_ACTIONS )
     {
-        const u8 *text;
-        u8 fontColorsId = (sPartyMenuInternal->actions[i] >= MENU_FIELD_MOVES) ? 4 : 3;
-        if (sPartyMenuInternal->actions[i] >= MENU_FIELD_MOVES)
-            text = gMovesInfo[sFieldMoves[sPartyMenuInternal->actions[i] - MENU_FIELD_MOVES]].name;
-        else
-            text = sCursorOptions[sPartyMenuInternal->actions[i]].text;
-
-        AddTextPrinterParameterized4(sPartyMenuInternal->windowId[0], FONT_NORMAL, cursorDimension, (i * 16) + 1, letterSpacing, 0, sFontColorTable[fontColorsId], 0, text);
+        InitMenuInUpperLeftCorner( sPartyMenuInternal->windowId[ 0 ], sPartyMenuInternal->numActions, 0, TRUE );
+        ScheduleBgCopyTilemapToVram( 2 );
+        return sPartyMenuInternal->windowId[ 0 ];
     }
 
-    InitMenuInUpperLeftCorner(sPartyMenuInternal->windowId[0], sPartyMenuInternal->numActions, 0, TRUE);
-    ScheduleBgCopyTilemapToVram(2);
+    u8 windowId = sPartyMenuInternal->windowId[ 0 ];
+    u8 cursorDimension = GetMenuCursorDimensionByFont( FONT_NORMAL, 0 );
+    u8 letterSpacing = GetFontAttribute( FONT_NORMAL, FONTATTR_LETTER_SPACING );
 
-    return sPartyMenuInternal->windowId[0];
+    for ( i = 0; i < sPartyMenuInternal->numActions; ++i )
+    {
+        u8 top = ( i * 16 ) + 1;
+        const u8* color = sFontColorTable[ 3 ];
+        const u8* text = sCursorOptions[ sPartyMenuInternal->actions[ i ] ].text;
+        AddTextPrinterParameterized4( windowId, FONT_NORMAL, cursorDimension, top, letterSpacing, 0, color, 0, text );
+    }
+
+    InitMenuInUpperLeftCorner( sPartyMenuInternal->windowId[ 0 ], sPartyMenuInternal->numActions, 0, TRUE );
+    ScheduleBgCopyTilemapToVram( 2 );
+
+    return sPartyMenuInternal->windowId[ 0 ];
 }
 
 static void PrintMessage(const u8 *text)
@@ -2789,36 +2855,194 @@ static void SetPartyMonSelectionActions(struct Pokemon *mons, u8 slotId, u8 acti
     }
 }
 
-static void SetPartyMonFieldSelectionActions(struct Pokemon *mons, u8 slotId)
+static bool8 ShouldEnableFieldMove( struct Pokemon* mon, u16 field_move )
 {
-    u8 i, j;
+    u16 species = GetMonData( mon, MON_DATA_SPECIES );
+    u16 move = sFieldMoves[ field_move ];
+    bool8 knows_move = FALSE;
+    u8 i;
 
-    sPartyMenuInternal->numActions = 0;
-    AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_SUMMARY);
-
-    // Add field moves to action list
-    for (i = 0; i < MAX_MON_MOVES; i++)
+    // Check to see if the pokemon knows the move already
+    for ( i = 0; i < MAX_MON_MOVES; ++i )
     {
-        for (j = 0; j != FIELD_MOVES_COUNT; j++)
+        if ( GetMonData( mon, MON_DATA_MOVE1 + i ) == move )
         {
-            if (GetMonData(&mons[slotId], i + MON_DATA_MOVE1) == sFieldMoves[j])
-            {
-                AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, j + MENU_FIELD_MOVES);
-                break;
-            }
+            knows_move = TRUE;
+            break;
         }
     }
 
-    if (!InBattlePike())
+    // For non-HMs, just return if the pokemon knows the move
+    if ( field_move > FIELD_MOVE_WATERFALL )
+        return knows_move;
+
+    // If this species doesn't know the move and can't learn the move, stop here
+    if ( ! knows_move && ! CanLearnTeachableMove( species, move ) )
+        return FALSE;
+
+    // By the time we get here, the pokemon either knows the move or can learn it
+    if ( move == MOVE_CUT )
     {
-        if (GetMonData(&mons[1], MON_DATA_SPECIES) != SPECIES_NONE)
-            AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_SWITCH);
-        if (ItemIsMail(GetMonData(&mons[slotId], MON_DATA_HELD_ITEM)))
-            AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_MAIL);
-        else
-            AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_ITEM);
+        if ( ! FlagGet( FLAG_BADGE01_GET ) )
+            return FALSE;
+
+        u8 i, j, side, tile;
+        s16 x_start, y_start, x, y;
+        bool8 is_near_grass = FALSE;
+
+        PlayerGetDestCoords( &x_start, &y_start );
+        side = ( GetMonAbility( mon ) == ABILITY_HYPER_CUTTER ) ? CUT_HYPER_SIDE : CUT_NORMAL_SIDE;
+        x_start = x_start - ( side / 2 );
+        y_start = y_start - ( side / 2 );
+
+        // Look all around the player for cuttable grass
+        // TODO This breaks with hyper cutter + obstacles. This thinks it can cut, but it can't
+        for ( i = 0; i < side; ++i )
+        {
+            y = y_start + i;
+            for ( j = 0; j < side; ++j )
+            {
+                x = x_start + j;
+
+                if ( MapGridGetElevationAt( x, y ) != PlayerGetElevation() )
+                    continue;
+
+                tile = MapGridGetMetatileBehaviorAt( x, y );
+                if ( MetatileBehavior_IsCuttableGrass( tile ) == TRUE )
+                {
+                    is_near_grass = TRUE;
+                    break;
+                }
+            }
+
+            if ( is_near_grass )
+                break;
+        }
+
+        if ( is_near_grass || CheckObjectGraphicsInFrontOfPlayer( OBJ_EVENT_GFX_CUTTABLE_TREE ) == TRUE )
+            if ( knows_move || CheckBagHasItem( ITEM_HM_FLASH, 1 ) )
+                return TRUE;
     }
-    AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_CANCEL1);
+    else if ( move == MOVE_FLASH )
+    {
+        // Registeel puzzle overrides everything else
+        if ( ShouldDoBrailleRegisteelEffect() )
+            return TRUE;
+
+        // This gets set when the player uses flash
+        if ( FlagGet( FLAG_SYS_USE_FLASH ) )
+            return FALSE;
+
+        if ( gMapHeader.cave == FALSE )
+            return FALSE;
+        if ( ! FlagGet( FLAG_BADGE02_GET ) )
+            return FALSE;
+        if ( knows_move || CheckBagHasItem( ITEM_HM_FLASH, 1 ) )
+            return TRUE;
+    }
+    else if ( move == MOVE_ROCK_SMASH )
+    {
+        // Regirock puzzle overrides everything else
+        if ( ShouldDoBrailleRegirockEffect() )
+            return TRUE;
+
+        if ( CheckObjectGraphicsInFrontOfPlayer( OBJ_EVENT_GFX_BREAKABLE_ROCK ) == FALSE )
+            return FALSE;
+        if ( ! FlagGet( FLAG_BADGE03_GET ) )
+            return FALSE;
+        if ( knows_move || CheckBagHasItem( ITEM_HM_ROCK_SMASH, 1 ) )
+            return TRUE;
+    }
+    else if ( move == MOVE_STRENGTH )
+    {
+        if ( CheckObjectGraphicsInFrontOfPlayer(OBJ_EVENT_GFX_PUSHABLE_BOULDER) == FALSE )
+            return FALSE;
+        if ( ! FlagGet( FLAG_BADGE04_GET ) )
+            return FALSE;
+        if ( knows_move || CheckBagHasItem( ITEM_HM_STRENGTH, 1 ) )
+            return TRUE;
+    }
+    else if ( move == MOVE_SURF )
+    {
+        if ( TestPlayerAvatarFlags( PLAYER_AVATAR_FLAG_SURFING ) )
+            return FALSE;
+        if ( ! IsPlayerFacingSurfableFishableWater() )
+            return FALSE;
+        if ( ! FlagGet( FLAG_BADGE05_GET ) )
+            return FALSE;
+        if ( knows_move || CheckBagHasItem( ITEM_HM_SURF, 1 ) )
+            return TRUE;
+    }
+    else if ( move == MOVE_FLY )
+    {
+        if ( gMapHeader.cave == TRUE )
+            return FALSE;
+        if ( gMapHeader.mapType == MAP_TYPE_UNDERWATER )
+            return FALSE;
+        if ( ! FlagGet( FLAG_BADGE06_GET ) )
+            return FALSE;
+        if ( knows_move || CheckBagHasItem( ITEM_HM_FLY, 1 ) )
+            return TRUE;
+    }
+    else if ( move == MOVE_DIVE )
+    {
+        if ( ! TestPlayerAvatarFlags( PLAYER_AVATAR_FLAG_SURFING ) )
+            return FALSE;
+
+        if ( gMapHeader.mapType == MAP_TYPE_UNDERWATER && TrySetDiveWarp() != 1 )
+                return FALSE;
+        if ( gMapHeader.mapType != MAP_TYPE_UNDERWATER && TrySetDiveWarp() != 2 )
+                return FALSE;
+        if ( ! FlagGet( FLAG_BADGE07_GET ) )
+            return FALSE;
+        if ( knows_move || CheckBagHasItem( ITEM_HM_DIVE, 1 ) )
+            return TRUE;
+    }
+    else if ( move == MOVE_WATERFALL )
+    {
+        s16 x, y;
+        GetXYCoordsOneStepInFrontOfPlayer( &x, &y );
+        u16 tile = MapGridGetMetatileBehaviorAt( x, y );
+
+        if ( ! MetatileBehavior_IsWaterfall( tile ) )
+            return FALSE;
+        if ( ! IsPlayerSurfingNorth() )
+            return FALSE;
+        if ( ! FlagGet( FLAG_BADGE08_GET ) )
+            return FALSE;
+        if ( knows_move || CheckBagHasItem( ITEM_HM_WATERFALL, 1 ) )
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void SetPartyMonFieldSelectionActions( struct Pokemon* mons, u8 slotId )
+{
+    u8 i;
+
+    sPartyMenuInternal->numActions = 0;
+    AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_SUMMARY );
+
+    // Append all of the field move actions
+    for ( i = FIELD_MOVE_CUT; i < FIELD_MOVES_COUNT; ++i )
+        if ( ShouldEnableFieldMove( &mons[ slotId ], i ) )
+            AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_FIELD_MOVES + i );
+
+    // If we're not in the battle pike, handle switching and mail/item actions
+    if ( ! InBattlePike() )
+    {
+        if ( GetMonData( &mons[ 1 ], MON_DATA_SPECIES ) != SPECIES_NONE )
+            AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_SWITCH );
+
+        if ( ItemIsMail( GetMonData( &mons[ slotId ], MON_DATA_HELD_ITEM ) ) )
+            AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_MAIL );
+        else
+            AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_ITEM );
+    }
+
+    AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_CANCEL1 );
+    return;
 }
 
 static u8 GetPartyMenuActionsType(struct Pokemon *mon)
@@ -2889,7 +3113,10 @@ static bool8 CreateSelectionWindow(u8 taskId)
     {
         SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
         DisplaySelectionWindow(SELECTWINDOW_ACTIONS);
+        DisplayActionsWindow( taskId );
         DisplayPartyMenuStdMessage(PARTY_MSG_DO_WHAT_WITH_MON);
+        gTasks[taskId].func = Task_HandleActionMenuInput;
+        return FALSE;
     }
     else
     {
@@ -2922,14 +3149,53 @@ static void Task_TryCreateSelectionWindow(u8 taskId)
     }
 }
 
+static void Task_HandleActionMenuInput( u8 taskId )
+{
+    if ( gPaletteFade.active || MenuHelpers_ShouldWaitForLinkRecv() )
+        return;
+
+    
+
+    // Get the input from the list menu
+    s32 input = ListMenu_ProcessInput( gTasks[ taskId ].data[ 0 ] );
+
+    if ( input != -1 )
+        DebugPrintf( "Got %d as the input", input );
+
+    switch ( input )
+    {
+        case LIST_NOTHING_CHOSEN:
+            break;
+
+        case LIST_CANCEL:
+            PlaySE( SE_SELECT );
+            PartyMenuRemoveWindow( &sPartyMenuInternal->windowId[ 2 ] );
+            sCursorOptions[ MENU_CANCEL1 ].func( taskId );
+            break;
+
+        default:
+            PartyMenuRemoveWindow( &sPartyMenuInternal->windowId[ 2 ] );
+            if ( input >= MENU_FIELD_MOVES )
+                CursorCb_FieldMove( taskId, input - MENU_FIELD_MOVES );
+            else
+                sCursorOptions[ input ].func( taskId );
+            break;
+    }
+
+    return;
+}
+
 static void Task_HandleSelectionMenuInput(u8 taskId)
 {
+    DebugPrintf( "HandleSelectionMenuInput got called." );
+    // TODO This might need to handle menu and listmenu separate
     if (!gPaletteFade.active && MenuHelpers_ShouldWaitForLinkRecv() != TRUE)
     {
         s8 input;
         s16 *data = gTasks[taskId].data;
+        u8 action;
 
-        if (sPartyMenuInternal->numActions <= 3)
+        if ( sPartyMenuInternal->numActions <= 3 )
             input = Menu_ProcessInputNoWrapAround_other();
         else
             input = ProcessMenuInput_other();
@@ -2942,17 +3208,19 @@ static void Task_HandleSelectionMenuInput(u8 taskId)
         case MENU_B_PRESSED:
             PlaySE(SE_SELECT);
             PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[2]);
-            if (sPartyMenuInternal->actions[sPartyMenuInternal->numActions - 1] >= MENU_FIELD_MOVES)
-                CursorCb_FieldMove(taskId);
+            action = sPartyMenuInternal->actions[ sPartyMenuInternal->numActions - 1 ];
+            if ( action >= MENU_FIELD_MOVES)
+                CursorCb_FieldMove( taskId, action - MENU_FIELD_MOVES );
             else
-                sCursorOptions[sPartyMenuInternal->actions[sPartyMenuInternal->numActions - 1]].func(taskId);
+                sCursorOptions[ action ].func(taskId);
             break;
         default:
             PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[2]);
-            if (sPartyMenuInternal->actions[input] >= MENU_FIELD_MOVES)
-                CursorCb_FieldMove(taskId);
+            action = sPartyMenuInternal->actions[ input ];
+            if ( action >= MENU_FIELD_MOVES)
+                CursorCb_FieldMove( taskId, action );
             else
-                sCursorOptions[sPartyMenuInternal->actions[input]].func(taskId);
+                sCursorOptions[ action ].func( taskId );
             break;
         }
     }
@@ -3684,7 +3952,10 @@ static void CursorCb_Cancel2(u8 taskId)
     if (gPartyMenu.menuType != PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
     {
         DisplaySelectionWindow(SELECTWINDOW_ACTIONS);
+        DisplayActionsWindow( taskId );
         DisplayPartyMenuStdMessage(PARTY_MSG_DO_WHAT_WITH_MON);
+        gTasks[taskId].func = Task_HandleActionMenuInput;
+        return;
     }
     else
     {
@@ -3692,8 +3963,10 @@ static void CursorCb_Cancel2(u8 taskId)
         CopyItemName(GetMonData(mon, MON_DATA_HELD_ITEM), gStringVar2);
         DisplayPartyMenuStdMessage(PARTY_MSG_ALREADY_HOLDING_ONE);
     }
-    gTasks[taskId].data[0] = 0xFF;
+
+    gTasks[taskId].data[ 0 ] = 0xFF;
     gTasks[taskId].func = Task_HandleSelectionMenuInput;
+    return;
 }
 
 static void CursorCb_SendMon(u8 taskId)
@@ -3896,9 +4169,9 @@ static void Task_HandleSpinTradeYesNoInput(u8 taskId)
     }
 }
 
-static void CursorCb_FieldMove(u8 taskId)
+static void CursorCb_FieldMove( u8 taskId, u8 fieldMove )
 {
-    u8 fieldMove = sPartyMenuInternal->actions[Menu_GetCursorPos()] - MENU_FIELD_MOVES;
+    // u8 fieldMove = sPartyMenuInternal->actions[Menu_GetCursorPos()] - MENU_FIELD_MOVES;
     const struct MapHeader *mapHeader;
 
     PlaySE(SE_SELECT);
