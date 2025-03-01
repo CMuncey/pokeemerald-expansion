@@ -216,7 +216,7 @@ struct PartyMenuInternal
     u32 spriteIdCancelPokeball:7;
     u32 messageId:14;
     u8 windowId[3];
-    u8 actions[8];
+    u8 actions[18];
     u8 numActions;
     // In vanilla Emerald, only the first 0xB0 hwords (0x160 bytes) are actually used.
     // However, a full 0x100 hwords (0x200 bytes) are allocated.
@@ -253,6 +253,9 @@ static EWRAM_DATA u16 sPartyMenuItemId = 0;
 EWRAM_DATA u8 gBattlePartyCurrentOrder[PARTY_SIZE / 2] = {0}; // bits 0-3 are the current pos of Slot 1, 4-7 are Slot 2, and so on
 static EWRAM_DATA u8 sInitialLevel = 0;
 static EWRAM_DATA u8 sFinalLevel = 0;
+
+static EWRAM_DATA struct ListMenuItem sActionMenuItems[ 18 ];
+static EWRAM_DATA u8 sActionMenuNames[ 18 ][ 32 ];
 
 // IWRAM common
 COMMON_DATA void (*gItemUseCB)(u8, TaskFunc) = NULL;
@@ -2705,9 +2708,6 @@ static bool8 ShouldUseChooseMonText(void)
     return FALSE;
 }
 
-struct ListMenuItem gActionMenuItems[ 18 ];
-u8 action_menu_names[ 18 ][ 32 ];
-
 static void DisplayActionsWindow( u8 taskId )
 {
     struct WindowTemplate window;
@@ -2730,7 +2730,7 @@ static void DisplayActionsWindow( u8 taskId )
     for ( i = 0; i < sPartyMenuInternal->numActions; ++i )
     {
         const u8* text;
-        action_menu_names[ i ][ 0 ] = EOS;
+        sActionMenuNames[ i ][ 0 ] = EOS;
 
         if ( sPartyMenuInternal->actions[ i ] >= MENU_FIELD_MOVES )
             text = gMovesInfo[ sFieldMoves[ sPartyMenuInternal->actions[ i ] - MENU_FIELD_MOVES ] ].name;
@@ -2738,16 +2738,15 @@ static void DisplayActionsWindow( u8 taskId )
             text = sCursorOptions[ sPartyMenuInternal->actions[ i ] ].text;
 
         if ( sPartyMenuInternal->actions[ i ] >= MENU_FIELD_MOVES )
-            StringCopy( action_menu_names[ i ], color );
-        StringAppend( action_menu_names[ i ], text );
+            StringCopy( sActionMenuNames[ i ], color );
+        StringAppend( sActionMenuNames[ i ], text );
 
-        DebugPrintf( "Adding { \"%S\", %d } to the list", text, sPartyMenuInternal->actions[ i ] );
-        gActionMenuItems[ i ].name = action_menu_names[ i ];
-        gActionMenuItems[ i ].id = sPartyMenuInternal->actions[ i ];
+        sActionMenuItems[ i ].name = sActionMenuNames[ i ];
+        sActionMenuItems[ i ].id = sPartyMenuInternal->actions[ i ];
     }
 
     // The rest is just default values in the template
-    list_menu.items = gActionMenuItems;
+    list_menu.items = sActionMenuItems;
     list_menu.totalItems = sPartyMenuInternal->numActions;
     list_menu.windowId = sPartyMenuInternal->windowId[ 0 ];
     list_menu.item_X = GetMenuCursorDimensionByFont( FONT_NORMAL, 0 );
@@ -2767,7 +2766,7 @@ static u8 DisplaySelectionWindow( u8 windowType )
     switch (windowType)
     {
         case SELECTWINDOW_ACTIONS:
-            SetWindowTemplateFields( &window, 2, 19, 19 - sPartyMenuInternal->numActions * 2, 10, sPartyMenuInternal->numActions * 2, 14, 0x2E9);
+            SetWindowTemplateFields( &window, 2, 19, 19 - ( sPartyMenuInternal->numActions * 2 ), 10, sPartyMenuInternal->numActions * 2, 14, 0x2E9);
             break;
 
         case SELECTWINDOW_ITEM:
@@ -3110,14 +3109,14 @@ static bool8 CreateSelectionWindow(u8 taskId)
 
     GetMonNickname(mon, gStringVar1);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
-DebugPrintf( "Menu type: %d", gPartyMenu.menuType );
-    if ( gPartyMenu.menuType == PARTY_MENU_TYPE_FIELD )
+
+    // We only want the new action menu when we open the menu from the start screen
+    if ( gPartyMenu.menuType == PARTY_MENU_TYPE_FIELD && gPartyMenu.action == PARTY_ACTION_CHOOSE_MON )
     {
-        DebugPrintf( "Doing the thing because the thing was true" );
         SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
         DisplayActionsWindow( taskId );
-        gTasks[taskId].func = Task_HandleActionMenuInput;
         DisplayPartyMenuStdMessage( PARTY_MSG_DO_WHAT_WITH_MON );
+        gTasks[taskId].func = Task_HandleActionMenuInput;
         return FALSE;
     }
     else if (gPartyMenu.menuType != PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
@@ -3950,14 +3949,13 @@ static void CursorCb_Cancel2(u8 taskId)
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
     SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
-DebugPrintf( "Menu type: %d", gPartyMenu.menuType );
-    if ( gPartyMenu.menuType == PARTY_MENU_TYPE_FIELD )
+
+    if ( gPartyMenu.menuType == PARTY_MENU_TYPE_FIELD && gPartyMenu.action == PARTY_ACTION_CHOOSE_MON )
     {
-        DebugPrintf( "Doing the thing because the thing was true" );
         SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
         DisplayActionsWindow( taskId );
-        gTasks[taskId].func = Task_HandleActionMenuInput;
         DisplayPartyMenuStdMessage(PARTY_MSG_DO_WHAT_WITH_MON);
+        gTasks[taskId].func = Task_HandleActionMenuInput;
         return;
     }
     else if (gPartyMenu.menuType != PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
