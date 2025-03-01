@@ -3026,7 +3026,7 @@ static void SetPartyMonFieldSelectionActions( struct Pokemon* mons, u8 slotId )
 
     // Append all of the field move actions
     for ( i = FIELD_MOVE_CUT; i < FIELD_MOVES_COUNT; ++i )
-        if ( TRUE || ShouldEnableFieldMove( &mons[ slotId ], i ) )
+        if ( ShouldEnableFieldMove( &mons[ slotId ], i ) )
             AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_FIELD_MOVES + i );
 
     // If we're not in the battle pike, handle switching and mail/item actions
