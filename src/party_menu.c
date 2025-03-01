@@ -216,7 +216,7 @@ struct PartyMenuInternal
     u32 spriteIdCancelPokeball:7;
     u32 messageId:14;
     u8 windowId[3];
-    u8 actions[18];
+    u8 actions[8];
     u8 numActions;
     // In vanilla Emerald, only the first 0xB0 hwords (0x160 bytes) are actually used.
     // However, a full 0x100 hwords (0x200 bytes) are allocated.
@@ -2710,7 +2710,18 @@ u8 action_menu_names[ 18 ][ 32 ];
 
 static void DisplayActionsWindow( u8 taskId )
 {
+    struct WindowTemplate window;
     u8 i, menuTaskId;
+
+    u8 left = 19;
+    u8 height = ( sPartyMenuInternal->numActions > 8 ) ? 16 : sPartyMenuInternal->numActions * 2;
+    u8 top = left - height;
+    SetWindowTemplateFields( &window, 2, left, top, 10, height, 14, 0x2E9);
+
+    sPartyMenuInternal->windowId[ 0 ] = AddWindow( &window );
+    DrawStdFrameWithCustomTileAndPalette( sPartyMenuInternal->windowId[ 0 ], FALSE, 0x4F, 13 );
+    InitMenuInUpperLeftCorner( sPartyMenuInternal->windowId[ 0 ], sPartyMenuInternal->numActions, 0, TRUE );
+    ScheduleBgCopyTilemapToVram( 2 );
 
     struct ListMenuTemplate list_menu = sSelectActionListMenuTemplate;
     const u8 color[] = _("{COLOR BLUE}");
@@ -2730,6 +2741,7 @@ static void DisplayActionsWindow( u8 taskId )
             StringCopy( action_menu_names[ i ], color );
         StringAppend( action_menu_names[ i ], text );
 
+        DebugPrintf( "Adding { \"%S\", %d } to the list", text, sPartyMenuInternal->actions[ i ] );
         gActionMenuItems[ i ].name = action_menu_names[ i ];
         gActionMenuItems[ i ].id = sPartyMenuInternal->actions[ i ];
     }
@@ -2752,15 +2764,10 @@ static u8 DisplaySelectionWindow( u8 windowType )
 {
     struct WindowTemplate window;
 
-    u8 i, left, height, top;
-
     switch (windowType)
     {
         case SELECTWINDOW_ACTIONS:
-            left = 19;
-            height = ( sPartyMenuInternal->numActions > 8 ) ? 16 : sPartyMenuInternal->numActions * 2;
-            top = left - height;
-            SetWindowTemplateFields( &window, 2, left, top, 10, height, 14, 0x2E9);
+            SetWindowTemplateFields( &window, 2, 19, 19 - sPartyMenuInternal->numActions * 2, 10, sPartyMenuInternal->numActions * 2, 14, 0x2E9);
             break;
 
         case SELECTWINDOW_ITEM:
@@ -2789,13 +2796,7 @@ static u8 DisplaySelectionWindow( u8 windowType )
     if ( windowType == SELECTWINDOW_MOVES )
         return sPartyMenuInternal->windowId[ 0 ];
 
-    if ( windowType == SELECTWINDOW_ACTIONS )
-    {
-        InitMenuInUpperLeftCorner( sPartyMenuInternal->windowId[ 0 ], sPartyMenuInternal->numActions, 0, TRUE );
-        ScheduleBgCopyTilemapToVram( 2 );
-        return sPartyMenuInternal->windowId[ 0 ];
-    }
-
+    u8 i;
     u8 windowId = sPartyMenuInternal->windowId[ 0 ];
     u8 cursorDimension = GetMenuCursorDimensionByFont( FONT_NORMAL, 0 );
     u8 letterSpacing = GetFontAttribute( FONT_NORMAL, FONTATTR_LETTER_SPACING );
@@ -3026,7 +3027,7 @@ static void SetPartyMonFieldSelectionActions( struct Pokemon* mons, u8 slotId )
 
     // Append all of the field move actions
     for ( i = FIELD_MOVE_CUT; i < FIELD_MOVES_COUNT; ++i )
-        if ( ShouldEnableFieldMove( &mons[ slotId ], i ) )
+        if ( TRUE || ShouldEnableFieldMove( &mons[ slotId ], i ) )
             AppendToList( sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_FIELD_MOVES + i );
 
     // If we're not in the battle pike, handle switching and mail/item actions
@@ -3109,14 +3110,21 @@ static bool8 CreateSelectionWindow(u8 taskId)
 
     GetMonNickname(mon, gStringVar1);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
-    if (gPartyMenu.menuType != PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
+DebugPrintf( "Menu type: %d", gPartyMenu.menuType );
+    if ( gPartyMenu.menuType == PARTY_MENU_TYPE_FIELD )
+    {
+        DebugPrintf( "Doing the thing because the thing was true" );
+        SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
+        DisplayActionsWindow( taskId );
+        gTasks[taskId].func = Task_HandleActionMenuInput;
+        DisplayPartyMenuStdMessage( PARTY_MSG_DO_WHAT_WITH_MON );
+        return FALSE;
+    }
+    else if (gPartyMenu.menuType != PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
     {
         SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
         DisplaySelectionWindow(SELECTWINDOW_ACTIONS);
-        DisplayActionsWindow( taskId );
         DisplayPartyMenuStdMessage(PARTY_MSG_DO_WHAT_WITH_MON);
-        gTasks[taskId].func = Task_HandleActionMenuInput;
-        return FALSE;
     }
     else
     {
@@ -3154,13 +3162,8 @@ static void Task_HandleActionMenuInput( u8 taskId )
     if ( gPaletteFade.active || MenuHelpers_ShouldWaitForLinkRecv() )
         return;
 
-    
-
     // Get the input from the list menu
     s32 input = ListMenu_ProcessInput( gTasks[ taskId ].data[ 0 ] );
-
-    if ( input != -1 )
-        DebugPrintf( "Got %d as the input", input );
 
     switch ( input )
     {
@@ -3187,8 +3190,6 @@ static void Task_HandleActionMenuInput( u8 taskId )
 
 static void Task_HandleSelectionMenuInput(u8 taskId)
 {
-    DebugPrintf( "HandleSelectionMenuInput got called." );
-    // TODO This might need to handle menu and listmenu separate
     if (!gPaletteFade.active && MenuHelpers_ShouldWaitForLinkRecv() != TRUE)
     {
         s8 input;
@@ -3218,7 +3219,7 @@ static void Task_HandleSelectionMenuInput(u8 taskId)
             PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[2]);
             action = sPartyMenuInternal->actions[ input ];
             if ( action >= MENU_FIELD_MOVES)
-                CursorCb_FieldMove( taskId, action );
+                CursorCb_FieldMove( taskId, action - MENU_FIELD_MOVES );
             else
                 sCursorOptions[ action ].func( taskId );
             break;
@@ -3949,13 +3950,20 @@ static void CursorCb_Cancel2(u8 taskId)
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
     SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
-    if (gPartyMenu.menuType != PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
+DebugPrintf( "Menu type: %d", gPartyMenu.menuType );
+    if ( gPartyMenu.menuType == PARTY_MENU_TYPE_FIELD )
+    {
+        DebugPrintf( "Doing the thing because the thing was true" );
+        SetPartyMonSelectionActions(gPlayerParty, gPartyMenu.slotId, GetPartyMenuActionsType(mon));
+        DisplayActionsWindow( taskId );
+        gTasks[taskId].func = Task_HandleActionMenuInput;
+        DisplayPartyMenuStdMessage(PARTY_MSG_DO_WHAT_WITH_MON);
+        return;
+    }
+    else if (gPartyMenu.menuType != PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
     {
         DisplaySelectionWindow(SELECTWINDOW_ACTIONS);
-        DisplayActionsWindow( taskId );
         DisplayPartyMenuStdMessage(PARTY_MSG_DO_WHAT_WITH_MON);
-        gTasks[taskId].func = Task_HandleActionMenuInput;
-        return;
     }
     else
     {
