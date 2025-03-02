@@ -29,6 +29,7 @@
 #include "window.h"
 #include "constants/rgb.h"
 #include "constants/songs.h"
+#include "data/pokedex.h"
 
 enum
 {
@@ -5879,4 +5880,68 @@ static void PrintSearchParameterTitle(u32 y, const u8 *str)
 static void ClearSearchParameterBoxText(void)
 {
     ClearSearchMenuRect(144, 8, 96, 96);
+}
+
+u16 CheckPokedexForGym( u8 gym )
+{
+    const s16* required_mons;
+    u16 missing_mons = 0;
+    u8 num_mons, i;
+
+    switch ( gym )
+    {
+        case GYM_LEADER_ROXANNE:
+            required_mons = sRequiredMonsRoxanne;
+            num_mons = ARRAY_COUNT( sRequiredMonsRoxanne );
+            break;
+
+        case GYM_LEADER_BRAWLY:
+            required_mons = sRequiredMonsBrawly;
+            num_mons = ARRAY_COUNT( sRequiredMonsBrawly );
+            break;
+
+        case GYM_LEADER_WATTSON:
+            required_mons = sRequiredMonsWattson;
+            num_mons = ARRAY_COUNT( sRequiredMonsWattson );
+            break;
+
+        case GYM_LEADER_FLANNERY:
+            required_mons = sRequiredMonsFlannery;
+            num_mons = ARRAY_COUNT( sRequiredMonsFlannery );
+            break;
+
+        case GYM_LEADER_NORMAN:
+            required_mons = sRequiredMonsNorman;
+            num_mons = ARRAY_COUNT( sRequiredMonsNorman );
+            break;
+
+        case GYM_LEADER_WINONA:
+            required_mons = sRequiredMonsWinona;
+            num_mons = ARRAY_COUNT( sRequiredMonsWinona );
+            break;
+
+        case GYM_LEADER_TATE_LIZA:
+            required_mons = sRequiredMonsTateLiza;
+            num_mons = ARRAY_COUNT( sRequiredMonsTateLiza );
+            break;
+
+        case GYM_LEADER_WALLACE:
+            required_mons = sRequiredMonsWallace;
+            num_mons = ARRAY_COUNT( sRequiredMonsWallace );
+            break;
+
+        case GYM_LEADER_ELITE_FOUR:
+            required_mons = sRequiredMonsEliteFour;
+            num_mons = ARRAY_COUNT( sRequiredMonsEliteFour );
+            break;
+
+        default:
+            return 0;
+    }
+
+    for ( i = 0; i < num_mons; ++i )
+        if ( ! GetSetPokedexFlag( required_mons[ i ], FLAG_GET_CAUGHT ) )
+            missing_mons++;
+
+    return missing_mons;
 }

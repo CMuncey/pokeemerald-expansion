@@ -14144,6 +14144,7 @@ Gender: Female
 Music: Female
 Double Battle: No
 AI: Basic Trainer
+Mugshot: Yellow
 
 Torkoal
 Level: 13
@@ -14160,8 +14161,9 @@ Pic: Leader Roxanne
 Gender: Female
 Music: Female
 Items: Full Restore / Full Restore / Full Restore
-Double Battle: Yes
+Double Battle: No
 AI: Basic Trainer
+Mugshot: Yellow
 
 Golem
 Level: 32
@@ -14204,6 +14206,7 @@ Music: Female
 Items: Full Restore / Full Restore / Full Restore
 Double Battle: Yes
 AI: Basic Trainer
+Mugshot: Yellow
 
 Omanyte
 Level: 37
@@ -14254,6 +14257,7 @@ Music: Female
 Items: Full Restore / Full Restore / Full Restore
 Double Battle: Yes
 AI: Basic Trainer
+Mugshot: Yellow
 
 Omastar
 Level: 42
@@ -14304,6 +14308,7 @@ Music: Female
 Items: Full Restore / Full Restore / Full Restore
 Double Battle: Yes
 AI: Basic Trainer
+Mugshot: Yellow
 
 Aerodactyl
 Level: 47

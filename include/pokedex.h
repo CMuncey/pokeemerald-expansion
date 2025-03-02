@@ -18,5 +18,6 @@ void CB2_OpenPokedex(void);
 void PrintMonMeasurements(u16 species, u32 owned);
 u8* ConvertMonHeightToString(u32 height);
 u8* ConvertMonWeightToString(u32 weight);
+u16 CheckPokedexForGym( u8 gym );
 
 #endif // GUARD_POKEDEX_H

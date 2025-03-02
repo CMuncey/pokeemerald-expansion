@@ -2433,6 +2433,14 @@
 	checkspecies \speciesId, OPEN_PARTY_SCREEN
 	.endm
 
+	@ Check if the player has caught all of the pokemon required to fight the given gym leader
+	@ Sets VAR_RESULT to the number of pokemon still needed to fight the gym
+	@ If the value is 0, then the gym can be fought
+	.macro checkpokedexforgym gymLeader:req
+	callnative ScrCmd_CheckPokedexForGym
+	.byte \gymLeader
+	.endm
+
 	@ Gets the facing direction of a given event object and stores it in the variable dest.
 	.macro getobjectfacingdirection localId:req, dest:req
 	callnative Scrcmd_getobjectfacingdirection

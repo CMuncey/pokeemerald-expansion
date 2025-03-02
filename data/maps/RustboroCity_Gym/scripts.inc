@@ -2,7 +2,34 @@ RustboroCity_Gym_MapScripts::
 	.byte 0
 
 RustboroCity_Gym_EventScript_Roxanne::
-	trainerbattle_single TRAINER_ROXANNE_1, RustboroCity_Gym_Text_RoxanneIntro, RustboroCity_Gym_Text_RoxanneDefeat, RustboroCity_Gym_EventScript_RoxanneDefeated, NO_MUSIC
+	goto_if_eq VAR_TALKED_TO_ROXANNE, 0, RustboroCity_Gym_EventScript_RoxanneIntro
+	checkpokedexforgym 0
+	buffernumberstring STR_VAR_1, VAR_RESULT
+	goto_if_gt VAR_RESULT, 0, RustboroCity_Gym_EventScript_RoxanneNotEnoughPokemon
+	msgbox RustboroCity_Gym_Text_RoxanneCheckPokedex, MSGBOX_DEFAULT
+	goto RustboroCity_Gym_EventScript_RoxanneFirstBattle
+
+RustboroCity_Gym_EventScript_RoxanneIntro::
+	msgbox RustboroCity_Gym_Text_RoxanneIntro, MSGBOX_DEFAULT
+	setvar VAR_TALKED_TO_ROXANNE, 1
+	checkpokedexforgym 0
+	buffernumberstring STR_VAR_1, VAR_RESULT
+	goto_if_gt VAR_RESULT, 0, RustboroCity_Gym_EventScript_RoxanneIntroNotEnoughPokemon
+	msgbox RustboroCity_Gym_Text_RoxanneIntroFullPokedex, MSGBOX_DEFAULT
+	goto RustboroCity_Gym_EventScript_RoxanneFirstBattle
+
+RustboroCity_Gym_EventScript_RoxanneIntroNotEnoughPokemon::
+	msgbox RustboroCity_Gym_Text_RoxanneIntroNotEnoughPokemon, MSGBOX_NPC
+	release
+	end
+
+RustboroCity_Gym_EventScript_RoxanneNotEnoughPokemon::
+	msgbox RustboroCity_Gym_Text_RoxanneNotEnoughPokemon, MSGBOX_NPC
+	release
+	end
+
+RustboroCity_Gym_EventScript_RoxanneFirstBattle::
+	trainerbattle_single TRAINER_ROXANNE_2, RustboroCity_Gym_Text_RoxanneBattleIntro, RustboroCity_Gym_Text_RoxanneDefeat, RustboroCity_Gym_EventScript_RoxanneDefeated, NO_MUSIC
 	specialvar VAR_RESULT, ShouldTryRematchBattle
 	goto_if_eq VAR_RESULT, TRUE, RustboroCity_Gym_EventScript_RoxanneRematch
 	goto_if_unset FLAG_RECEIVED_TM_ROCK_TOMB, RustboroCity_Gym_EventScript_GiveRockTomb
@@ -181,8 +208,11 @@ RustboroCity_Gym_Text_RoxanneIntro:
 	.string "I became a GYM LEADER so that I might\n"
 	.string "apply what I learned at the POKéMON\l"
 	.string "TRAINER'S SCHOOL in battle.\p"
-	.string "Would you kindly demonstrate how you\n"
-	.string "battle, and with which POKéMON?$"
+	.string "Before we can battle though, I need\n"
+	.string "to check your POKéDEX. New league\l"
+	.string "rules require trainers to have caught\l"
+	.string "one of every possible POKéMON before\l"
+	.string "they are allowed to challenge the gym.$"
 
 RustboroCity_Gym_Text_RoxanneDefeat:
 	.string "So…\n"
@@ -281,3 +311,27 @@ RustboroCity_Gym_Text_RoxanneRematchNeedTwoMons:
 	.string "You only have one POKéMON with you?\p"
 	.string "Please return with at least one more\n"
 	.string "POKéMON.$"
+
+RustboroCity_Gym_Text_RoxanneNotEnoughPokemon:
+	.string "ROXANNE: Please allow me to check your\n"
+	.string "your POKéDEX.\p"
+	.string "It loke like you still need to catch\n"
+	.string "{STR_VAR_1} more POKéMON.$"
+
+RustboroCity_Gym_Text_RoxanneCheckPokedex:
+	.string "ROXANNE: Please allow me to check\n"
+	.string "your POKéDEX.\p"
+	.string "Congratulations, It appears that\n"
+	.string "you have caught all of the required\l"
+	.string "POKéMON.$"
+
+RustboroCity_Gym_Text_RoxanneIntroNotEnoughPokemon:
+	.string "It looks like you still need to catch\n"
+	.string "{STR_VAR_1} POKéMON.$"
+
+RustboroCity_Gym_Text_RoxanneIntroFullPokedex:
+	.string "Oh. It appears that you've already\n"
+	.string "caught all of the required POKéMON.$"
+
+RustboroCity_Gym_Text_RoxanneBattleIntro:
+	.string "$"

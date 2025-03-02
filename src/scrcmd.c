@@ -2553,6 +2553,12 @@ bool8 Scrcmd_checkspecies_choose(struct ScriptContext *ctx)
     return FALSE;
 }
 
+bool8 ScrCmd_CheckPokedexForGym( struct ScriptContext* ctx )
+{
+    gSpecialVar_Result = CheckPokedexForGym( ScriptReadByte( ctx ) );
+    return FALSE;
+}
+
 bool8 Scrcmd_getobjectfacingdirection(struct ScriptContext *ctx)
 {
     u32 objectId = VarGet(ScriptReadHalfword(ctx));
