@@ -515,6 +515,7 @@ LittlerootTown_ProfessorBirchsLab_EventScript_GivePokedex::
 	call LittlerootTown_ProfessorBirchsLab_EventScript_ReceivePokedex
 	msgbox LittlerootTown_ProfessorBirchsLab_Text_ExplainPokedex, MSGBOX_DEFAULT
 	closemessage
+	call LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters
 	applymovement LOCALID_RIVAL, LittlerootTown_ProfessorBirchsLab_Movement_RivalApproachPlayer
 	waitmovement 0
 	applymovement OBJ_EVENT_ID_PLAYER, Common_Movement_WalkInPlaceFasterRight
@@ -556,8 +557,71 @@ LittlerootTown_ProfessorBirchsLab_EventScript_ReceivePokedex::
 	setvar VAR_CABLE_CLUB_TUTORIAL_STATE, 1
 	return
 
+LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters::
+	msgbox LittlerootTown_ProfessorBirchsLab_Text_GiveExtraStarters, MSGBOX_DEFAULT
+	call_if_eq VAR_STARTER_MON, 0, LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Torchic
+	call_if_eq VAR_STARTER_MON, 0, LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Mudkip
+	call_if_eq VAR_STARTER_MON, 1, LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Treecko
+	call_if_eq VAR_STARTER_MON, 1, LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Mudkip
+	call_if_eq VAR_STARTER_MON, 2, LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Treecko
+	call_if_eq VAR_STARTER_MON, 2, LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Torchic
+	return
+
+LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Treecko::
+	bufferspeciesname STR_VAR_1, SPECIES_TREECKO
+	setvar VAR_TEMP_TRANSFERRED_SPECIES, SPECIES_TREECKO
+	givemon SPECIES_TREECKO, 5
+	playfanfare MUS_OBTAIN_ITEM
+	message LittlerootTown_ProfessorBirchsLab_Text_ReceivedJohtoStarter
+	waitmessage
+	waitfanfare
+	call LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_BoxParty
+	return
+
+LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Mudkip::
+	bufferspeciesname STR_VAR_1, SPECIES_MUDKIP
+	setvar VAR_TEMP_TRANSFERRED_SPECIES, SPECIES_MUDKIP
+	givemon SPECIES_MUDKIP, 5
+	playfanfare MUS_OBTAIN_ITEM
+	message LittlerootTown_ProfessorBirchsLab_Text_ReceivedJohtoStarter
+	waitmessage
+	waitfanfare
+	call LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_BoxParty
+	return
+
+LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_Torchic::
+	bufferspeciesname STR_VAR_1, SPECIES_TORCHIC
+	setvar VAR_TEMP_TRANSFERRED_SPECIES, SPECIES_TORCHIC
+	givemon SPECIES_TORCHIC, 5
+	playfanfare MUS_OBTAIN_ITEM
+	message LittlerootTown_ProfessorBirchsLab_Text_ReceivedJohtoStarter
+	waitmessage
+	waitfanfare
+	call LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_BoxParty
+	return
+
+LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters_BoxParty::
+	copyvar VAR_TEMP_F, VAR_RESULT
+	call_if_eq VAR_TEMP_F, MON_GIVEN_TO_PARTY, LittlerootTown_ProfessorBirchsLab_EventScript_SendExtraStarterToParty
+	call_if_eq VAR_TEMP_F, MON_GIVEN_TO_PC, LittlerootTown_ProfessorBirchsLab_EventScript_SendExtraStarterToPC
+	return
+
+LittlerootTown_ProfessorBirchsLab_EventScript_SendExtraStarterToParty::
+	msgbox gText_NicknameThisPokemon, MSGBOX_YESNO
+	copyvar VAR_TEMP_E, VAR_RESULT
+	call_if_eq VAR_TEMP_E, YES, Common_EventScript_GetGiftMonPartySlot
+	call_if_eq VAR_TEMP_E, YES, Common_EventScript_NameReceivedPartyMon
+	return
+
+LittlerootTown_ProfessorBirchsLab_EventScript_SendExtraStarterToPC::
+	msgbox gText_NicknameThisPokemon, MSGBOX_YESNO
+	call_if_eq VAR_RESULT, YES, Common_EventScript_NameReceivedBoxMon
+	call Common_EventScript_TransferredToPC 
+	return
+
 LittlerootTown_ProfessorBirchsLab_EventScript_PokemonAwait::
 	msgbox LittlerootTown_ProfessorBirchsLab_Text_CountlessPokemonAwait, MSGBOX_DEFAULT
+	call LittlerootTown_ProfessorBirchsLab_EventScript_GiveExtraStarters
 	release
 	end
 
@@ -999,3 +1063,6 @@ LittlerootTown_ProfessorBirchsLab_Text_ScottAboardSSTidalCall:
 	.string "we meet. I'll be waiting!\p"
 	.string "… … … … … …\n"
 	.string "… … … … … Click!$"
+
+LittlerootTown_ProfessorBirchsLab_Text_GiveExtraStarters:
+	.string "Here's the starters you missed.$"
