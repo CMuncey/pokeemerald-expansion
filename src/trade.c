@@ -3321,6 +3321,16 @@ static void BufferTradeSceneStrings(void)
         GetMonData(&gPlayerParty[gSelectedTradeMonPositions[TRADE_PLAYER]], MON_DATA_NICKNAME, name);
         StringCopy_Nickname(gStringVar2, name);
     }
+    else if ( gSpecialVar_0x8004 > 5 )
+    {
+        // This is a Mom trade. Since we're just trading back the
+        // same pokemon, set both nicknames to the same thing.
+        const u8 mom_name[ 4 ] = _("MOM");
+        StringCopy( gStringVar1, mom_name );
+        GetMonData( &gEnemyParty[ 0 ], MON_DATA_NICKNAME, name );
+        StringCopy_Nickname( gStringVar2, name );
+        StringCopy_Nickname( gStringVar3, name );
+    }
     else
     {
         ingameTrade = &sIngameTrades[gSpecialVar_0x8004];
@@ -4600,7 +4610,12 @@ u16 GetTradeSpecies(void)
 
 void CreateInGameTradePokemon(void)
 {
-    CreateInGameTradePokemonInternal(gSpecialVar_0x8005, gSpecialVar_0x8004);
+    // If the party index is larger than 5, this must be a Mom trade
+    if ( gSpecialVar_0x8004 > 5 )
+        gEnemyParty[ 0 ] = gPlayerParty[ gSpecialVar_0x8005 ];
+    else
+        CreateInGameTradePokemonInternal( gSpecialVar_0x8005, gSpecialVar_0x8004 );
+    return;
 }
 
 static void CB2_UpdateLinkTrade(void)

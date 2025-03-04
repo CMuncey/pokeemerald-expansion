@@ -350,8 +350,11 @@ PlayersHouse_1F_EventScript_TryGiveAmuletCoin::
 	end
 
 PlayersHouse_1F_EventScript_MomHealsParty::
-	msgbox PlayersHouse_1F_Text_YouShouldRestABit, MSGBOX_DEFAULT
-	goto PlayersHouse_1F_EventScript_HealParty
+	msgbox PlayersHouse_1F_Text_YouShouldRestABit, MSGBOX_YESNO
+	goto_if_eq VAR_RESULT, YES, PlayersHouse_1F_EventScript_HealParty
+	msgbox PlayersHouse_1F_Text_MomAskToTrade, MSGBOX_YESNO
+	goto_if_eq VAR_RESULT, YES, PlayersHouse_1F_EventScript_MomTrade
+	goto PlayersHose_1F_EventScript_CancelMomTrade
 	end
 
 PlayersHouse_1F_EventScript_SeeYouHoney::
@@ -365,6 +368,23 @@ PlayersHouse_1F_EventScript_HealParty::
 	incrementgamestat GAME_STAT_RESTED_AT_HOME
 	msgbox PlayersHouse_1F_Text_TakeCareHoney, MSGBOX_DEFAULT
 	release
+	end
+
+PlayersHouse_1F_EventScript_MomTrade::
+	msgbox PlayersHouse_1F_Text_MomWhichMonToTrade, MSGBOX_DEFAULT
+	special ChoosePartyMon
+	waitstate
+	goto_if_eq VAR_0x8004, PARTY_NOTHING_CHOSEN, PlayersHose_1F_EventScript_CancelMomTrade
+	copyvar VAR_0x8005, VAR_0x8004
+	setvar VAR_0x8004, 6
+	special CreateInGameTradePokemon
+	special DoInGameTradeScene
+	waitstate
+	msgbox PlayersHouse_1F_Text_MomDoneTrade, MSGBOX_NPC
+	end
+
+PlayersHose_1F_EventScript_CancelMomTrade::
+	msgbox PlayersHouse_1F_Text_CancelMomTrade, MSGBOX_NPC
 	end
 
 PlayersHouse_1F_EventScript_DidYouMeetProfBirch::

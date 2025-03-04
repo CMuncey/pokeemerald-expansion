@@ -340,7 +340,20 @@ PlayersHouse_1F_Text_DidYouMeetProfBirch:
 PlayersHouse_1F_Text_YouShouldRestABit:
 	.string "MOM: How are you doing, {PLAYER}?\n"
 	.string "You look a little tired.\p"
-	.string "I think you should rest a bit.$"
+	.string "Would you like to rest a bit?$"
+
+PlayersHouse_1F_Text_MomAskToTrade:
+	.string "Would you like to do a trade?$"
+
+PlayersHouse_1F_Text_MomWhichMonToTrade:
+	.string "Which POKéMON do you want to trade?$"
+
+PlayersHouse_1F_Text_MomDoneTrade:
+	.string "That was fun, let me know if you\n"
+	.string "want to trade any more POKéMON.$"
+
+PlayersHouse_1F_Text_CancelMomTrade:
+	.string "Oh well, another time maybe.$"
 
 PlayersHouse_1F_Text_TakeCareHoney:
 	.string "MOM: Take care, honey!$"
